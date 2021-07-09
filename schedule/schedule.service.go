@@ -26,7 +26,6 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 		weeklyScheduleList, err := getScheduleList()
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
-			log.Fatal(err)
 			return
 		}
 		weeklyScheduleJson, err := json.Marshal(weeklyScheduleList)
@@ -52,17 +51,26 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		_, err = addOrUpdateSchedule(newWeeklySchedule)
+		scheduleId, err := insertSchedule(newWeeklySchedule)
+		newWeeklySchedule.Id = scheduleId
 		if err != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			return
 		}
+		weeklyScheduleJson, err := json.Marshal(newWeeklySchedule)
+		if err != nil {
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.Write(weeklyScheduleJson)
 		w.WriteHeader(http.StatusCreated)
 		return
 	case http.MethodOptions:
 		return
 	}
 }
+
+
 
 func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 	urlPathSegments := strings.Split(r.URL.Path, "schedule/")
@@ -71,7 +79,11 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(http.StatusNotFound)
 		return
 	}
-	schedule := getSchedule(scheduleId)
+	schedule, err:= getSchedule(scheduleId)
+	if err != nil {
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
 	if schedule == nil {
 		w.WriteHeader(http.StatusNotFound)
 		return
@@ -101,7 +113,12 @@ func scheduleHandler(w http.ResponseWriter, r *http.Request) {
 			w.WriteHeader(http.StatusBadRequest)
 			return
 		}
-		addOrUpdateSchedule(updatedSchedule)
+		err = updateSchedule(updatedSchedule)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
 		w.WriteHeader(http.StatusOK)
 		return
 	case http.MethodOptions:

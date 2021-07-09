@@ -1,68 +1,107 @@
 package schedule
 
 import (
-	"encoding/json"
-	"fmt"
+	"database/sql"
+	"errors"
 	"github.com/jhallat/todo-schedule-service/database"
-	"io/ioutil"
 	"log"
-	"os"
-	"sort"
-	"sync"
+	"strings"
 )
 
-var scheduleMap = struct {
-	sync.RWMutex
-	m map[int]WeeklySchedule
-}{m: make(map[int]WeeklySchedule)}
-
-func init() {
-	fmt.Println("loading weekly schedule...")
-	sMap, err := loadScheduleMap()
-	scheduleMap.m = sMap
-	if err != nil {
-		log.Fatalln(err)
-	}
-	fmt.Printf("%d schedules loaded ... \n", len(scheduleMap.m))
+type WeeklyScheduleDTO struct {
+	Id           int          `json:"id"`
+	Description  string       `json:"description"`
+	Days         string       `json:"selectedDays"`
 }
 
-func loadScheduleMap() (map[int]WeeklySchedule, error) {
-	fileName := "weekly-schedule.json"
-	_, err := os.Stat(fileName)
-	if os.IsNotExist(err) {
-		return nil, fmt.Errorf("file [%s] does not exist", fileName)
+func convertStringToDays(dayString string) (DaySelection, error){
+	var converted DaySelection
+	var days = strings.Split(dayString, "")
+	if len(days) != 7 {
+		return converted, errors.New("invalid day string")
 	}
-	file, _ := ioutil.ReadFile(fileName)
-	scheduleList := make([]WeeklySchedule, 0)
-	err = json.Unmarshal([]byte(file), &scheduleList)
-	if err != nil {
-		log.Fatal(err)
-	}
-	sMap := make(map[int]WeeklySchedule)
-	for i := 0; i < len(scheduleList); i++ {
-		sMap[scheduleList[i].Id] = scheduleList[i]
-	}
-	return sMap, nil
+	converted.Sunday = days[0] == "1"
+	converted.Monday = days[1] == "1"
+	converted.Tuesday = days[2] == "1"
+	converted.Wednesday = days[3] == "1"
+	converted.Thursday = days[4] == "1"
+	converted.Friday = days[5] == "1"
+	converted.Saturday = days[6] == "1"
+	return converted, nil
 }
 
-func getSchedule(id int) *WeeklySchedule {
+func convertDaysToString(days DaySelection) string {
+	converted := ""
+	if days.Sunday {
+		converted = converted + "1"
+	} else {
+		converted = converted + "0"
+	}
+	if days.Monday {
+		converted = converted + "1"
+	} else {
+		converted = converted + "0"
+	}
+	if days.Tuesday {
+		converted = converted + "1"
+	} else {
+		converted = converted + "0"
+	}
+	if days.Wednesday {
+		converted = converted + "1"
+	} else {
+		converted = converted + "0"
+	}
+	if days.Thursday {
+		converted = converted + "1"
+	} else {
+		converted = converted + "0"
+	}
+	if days.Friday {
+		converted = converted + "1"
+	} else {
+		converted = converted + "0"
+	}
+	if days.Saturday {
+		converted = converted + "1"
+	} else {
+		converted = converted + "0"
+	}
+	return converted
+}
+
+
+func getSchedule(id int) (*WeeklySchedule, error) {
 	row := database.DbConnection.QueryRow(`SELECT id, 
        description, 
-       days as selectedDays 
+       days
        FROM weeklyschedule
-       WHERE id = ?`)
-	scheduleMap.RLock()
-	defer scheduleMap.RUnlock()
-	if schedule, ok := scheduleMap.m[id]; ok {
-		return &schedule
+       WHERE id = ?`, id)
+	schedule := &WeeklyScheduleDTO{}
+	err := row.Scan(&schedule.Id,
+		&schedule.Description,
+		&schedule.Days)
+	if err == sql.ErrNoRows {
+		return nil, nil
+	} else if err != nil {
+		return nil, err
 	}
-	return nil
+	selectedDays, _ := convertStringToDays(schedule.Days)
+	convertedSchedule := &WeeklySchedule{
+		Id: schedule.Id,
+		Description: schedule.Description,
+		SelectedDays: selectedDays,
+	}
+	return convertedSchedule, nil
 }
 
-func removeSchedule(id int) {
-	scheduleMap.Lock()
-	defer scheduleMap.Unlock()
-	delete(scheduleMap.m, id)
+func removeSchedule(id int) error {
+	_, err := database.DbConnection.Query(`DELETE FROM weeklyschedule 
+       WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	return nil
 }
 
 func getScheduleList() ([]WeeklySchedule, error) {
@@ -76,45 +115,51 @@ func getScheduleList() ([]WeeklySchedule, error) {
 	defer results.Close()
 	schedules := make([]WeeklySchedule, 0)
 	for results.Next() {
-		var schedule WeeklySchedule
+		var schedule WeeklyScheduleDTO
 		results.Scan(&schedule.Id,
 			         &schedule.Description,
-			         &schedule.SelectedDays)
-		schedules = append(schedules, schedule)
+			         &schedule.Days)
+		selectedDays, _ := convertStringToDays(schedule.Days)
+		convertedSchedule := WeeklySchedule{
+			Id: schedule.Id,
+			Description: schedule.Description,
+			SelectedDays: selectedDays,
+		}
+		schedules = append(schedules, convertedSchedule)
 	}
 	return schedules, nil
 }
 
-func getScheduleIds() []int {
-	scheduleMap.RLock()
-	scheduleIds := []int{}
-	for key := range scheduleMap.m {
-		scheduleIds = append(scheduleIds, key)
+
+func updateSchedule(schedule WeeklySchedule) error {
+	days := convertDaysToString(schedule.SelectedDays)
+	_, err := database.DbConnection.Exec(`UPDATE weeklyschedule 
+    SET description = ?,
+        days = ?
+    WHERE id = ?`,
+		schedule.Description,
+		days,
+		schedule.Id)
+	if err != nil {
+		return err
 	}
-	scheduleMap.RUnlock()
-	sort.Ints(scheduleIds)
-	return scheduleIds
+	return nil
 }
 
-func getNextScheduleId() int {
-	scheduleIds := getScheduleIds()
-	return scheduleIds[len(scheduleIds)-1]+1
-}
-
-func addOrUpdateSchedule(schedule WeeklySchedule) (int, error) {
-	addOrUpdateId := -1
-	if schedule.Id > 0 {
-		oldSchedule := getSchedule(schedule.Id)
-		if oldSchedule == nil {
-			return 0, fmt.Errorf("schedule id [%d] doesn't exist", schedule.Id)
-		}
-		addOrUpdateId = schedule.Id
-	} else {
-		addOrUpdateId = getNextScheduleId()
-		schedule.Id = addOrUpdateId
+func insertSchedule(schedule WeeklySchedule) (int, error) {
+	days := convertDaysToString(schedule.SelectedDays)
+	result, err := database.DbConnection.Exec(`INSERT INTO 
+        weeklyschedule (description, days)  
+        VALUES ($1, $2);`,
+		schedule.Description,
+		days)
+	if err != nil {
+		log.Print(err)
+		return 0, nil
 	}
-	scheduleMap.Lock()
-	scheduleMap.m[addOrUpdateId] = schedule
-	scheduleMap.Unlock()
-	return addOrUpdateId, nil
+	insertId, err := result.LastInsertId()
+	if err != nil {
+		return 0, nil
+	}
+	return int(insertId), nil
 }
