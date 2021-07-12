@@ -3,6 +3,7 @@ package main
 import (
 	_ "github.com/jackc/pgx/v4/stdlib"
 	"github.com/jhallat/todo-schedule-service/database"
+	"github.com/jhallat/todo-schedule-service/health"
 	"github.com/jhallat/todo-schedule-service/schedule"
 	"github.com/jhallat/todo-schedule-service/task"
 	"net/http"
@@ -14,5 +15,6 @@ func main() {
 	database.SetupDatabase()
 	schedule.SetupRoutes(apiBasePath)
 	task.SetupRoutes(apiBasePath)
+	health.SetupHealth()
 	http.ListenAndServe(":5002", nil)
 }
