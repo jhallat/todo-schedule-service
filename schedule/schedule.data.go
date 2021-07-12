@@ -75,7 +75,7 @@ func getSchedule(id int) (*WeeklySchedule, error) {
 	row := database.DbConnection.QueryRow(`SELECT id, 
        description, 
        days
-       FROM weeklyschedule
+       FROM weekly_schedule
        WHERE id = ?`, id)
 	schedule := &WeeklyScheduleDTO{}
 	err := row.Scan(&schedule.Id,
@@ -96,7 +96,7 @@ func getSchedule(id int) (*WeeklySchedule, error) {
 }
 
 func removeSchedule(id int) error {
-	_, err := database.DbConnection.Query(`DELETE FROM weeklyschedule 
+	_, err := database.DbConnection.Query(`DELETE FROM weekly_schedule 
        WHERE id = ?`, id)
 	if err != nil {
 		return err
@@ -108,7 +108,7 @@ func getScheduleList() ([]WeeklySchedule, error) {
 	results, err := database.DbConnection.Query(`SELECT id, 
        description, 
        days as selectedDays 
-       FROM weeklyschedule`)
+       FROM weekly_schedule`)
 	if err != nil {
 		return nil, err
 	}
@@ -133,7 +133,7 @@ func getScheduleList() ([]WeeklySchedule, error) {
 
 func updateSchedule(schedule WeeklySchedule) error {
 	days := convertDaysToString(schedule.SelectedDays)
-	_, err := database.DbConnection.Exec(`UPDATE weeklyschedule 
+	_, err := database.DbConnection.Exec(`UPDATE weekly_schedule 
     SET description = ?,
         days = ?
     WHERE id = ?`,
@@ -149,7 +149,7 @@ func updateSchedule(schedule WeeklySchedule) error {
 func insertSchedule(schedule WeeklySchedule) (int, error) {
 	days := convertDaysToString(schedule.SelectedDays)
 	result, err := database.DbConnection.Exec(`INSERT INTO 
-        weeklyschedule (description, days)  
+        weekly_schedule (description, days)  
         VALUES ($1, $2);`,
 		schedule.Description,
 		days)
