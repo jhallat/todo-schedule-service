@@ -17,6 +17,12 @@ const sqlInsertTask = `
      scheduled_task (schedule_id, task_id, task_description, task_quantity)
      values ($1, $2, $3, $4)`
 
+const sqlUpdateTask = `
+	UPDATE scheduled_task
+    SET task_description = $2
+    WHERE task_id = $1
+`
+
 func insertScheduledTask(task ScheduledTask) error {
 	_, err := database.DbConnection.Exec(sqlInsertTask,
      task.ScheduleId,
@@ -42,4 +48,11 @@ func getScheduledTasksBySchedule(scheduleId int) ([]ScheduledTask, error) {
 		tasks = append(tasks, task)
 	}
 	return tasks, nil
+}
+
+func updateDescription(task UpdatedTask) error {
+	_, err := database.DbConnection.Exec(sqlUpdateTask,
+		task.Id,
+		task.Description)
+	return err
 }

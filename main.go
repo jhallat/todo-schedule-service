@@ -16,5 +16,6 @@ func main() {
 	schedule.SetupRoutes(apiBasePath)
 	task.SetupRoutes(apiBasePath)
 	health.SetupHealth()
+	task.SetupListener()
 	http.ListenAndServe(":5002", nil)
 }
