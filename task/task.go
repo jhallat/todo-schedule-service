@@ -5,6 +5,8 @@ type ScheduledTask struct {
 	TaskId          int    `json:"taskId"`
 	TaskDescription string `json:"taskDescription"`
 	TaskQuantity	int    `json:"taskQuantity"`
+	GoalId          int    `json:"goalId"`
+	GoalDescription int    `json:"goalDescription"`
 }
 
 type UpdatedTask struct {
