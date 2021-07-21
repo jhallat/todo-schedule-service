@@ -53,6 +53,7 @@ func getScheduledTasksBySchedule(scheduleId int) ([]ScheduledTask, error) {
 			         &task.GoalDescription)
 		tasks = append(tasks, task)
 	}
+
 	return tasks, nil
 }
 
