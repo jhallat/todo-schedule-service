@@ -1,14 +1,11 @@
 package schedule
 
 import (
-	"encoding/json"
 	"fmt"
 	"github.com/jhallat/todo-schedule-service/cors"
-	"io/ioutil"
-	"log"
+	"github.com/jhallat/todo-schedule-service/httphelper"
 	"net/http"
 	"strconv"
-	"strings"
 )
 
 const schedulesBasePath = "schedules"
@@ -23,48 +20,13 @@ func SetupRoutes(apiBasePath string) {
 func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
-		weeklyScheduleList, err := getScheduleList()
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		weeklyScheduleJson, err := json.Marshal(weeklyScheduleList)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(weeklyScheduleJson)
+		httphelper.GetRequest(w,  r, "", func(map[string]string) (interface{}, error){ return getScheduleList() })
 	case http.MethodPost:
-		var newWeeklySchedule WeeklySchedule
-		bodyBytes, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		err = json.Unmarshal(bodyBytes, &newWeeklySchedule)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if newWeeklySchedule.Id != 0 {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		scheduleId, err := insertSchedule(newWeeklySchedule)
-		newWeeklySchedule.Id = scheduleId
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		weeklyScheduleJson, err := json.Marshal(newWeeklySchedule)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Write(weeklyScheduleJson)
-		w.WriteHeader(http.StatusCreated)
-		return
+		var weeklySchedule WeeklySchedule
+		httphelper.PostRequest(w, r, "Id", &weeklySchedule, func( ) (int64, error) {
+			id, err := insertSchedule(weeklySchedule)
+			return int64(id), err
+		})
 	case http.MethodOptions:
 		return
 	}
@@ -73,58 +35,41 @@ func schedulesHandler(w http.ResponseWriter, r *http.Request) {
 
 
 func scheduleHandler(w http.ResponseWriter, r *http.Request) {
-	urlPathSegments := strings.Split(r.URL.Path, "schedule/")
-	scheduleId, err := strconv.Atoi(urlPathSegments[len(urlPathSegments)-1])
-	if err != nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
-	schedule, err:= getSchedule(scheduleId)
-	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		return
-	}
-	if schedule == nil {
-		w.WriteHeader(http.StatusNotFound)
-		return
-	}
 	switch r.Method {
 	case http.MethodGet:
-		scheduleJSON, err := json.Marshal(schedule)
-		if err != nil {
-			w.WriteHeader(http.StatusInternalServerError)
-			return
-		}
-		w.Header().Set("Content-Type", "application/json")
-		w.Write(scheduleJSON)
+		httphelper.GetRequest(w,  r, "schedules/:id", func(params map[string]string) (interface{}, error){
+			id := params["id"]
+			scheduleId, err := strconv.Atoi(id)
+			if err != nil { return nil, err }
+			return getSchedule(scheduleId)
+		})
 	case http.MethodPut:
-		var updatedSchedule WeeklySchedule
-		bodyBytes, err := ioutil.ReadAll(r.Body)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		err = json.Unmarshal(bodyBytes, &updatedSchedule)
-		if err != nil {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		if updatedSchedule.Id != scheduleId {
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		err = updateSchedule(updatedSchedule)
-		if err != nil {
-			log.Print(err)
-			w.WriteHeader(http.StatusBadRequest)
-			return
-		}
-		w.WriteHeader(http.StatusOK)
-		return
+		var weeklySchedule WeeklySchedule
+		httphelper.PutRequest(w,  r,
+			"schedules/:id",
+			"Id",
+			weeklySchedule,
+			func(params map[string]string) (interface{}, error){
+				id := params["id"]
+				scheduleId, err := strconv.Atoi(id)
+				if err != nil { return nil, err }
+				return getSchedule(scheduleId)
+		     },
+		     func() error {
+				return updateSchedule(weeklySchedule)
+			 })
 	case http.MethodOptions:
 		return
 	case http.MethodDelete:
-		removeSchedule(scheduleId)
+		httphelper.DeleteRequest(w, r,
+			"schedule/:id",
+			func(params map[string]string) error {
+				id := params["id"]
+				scheduleId, err := strconv.Atoi(id)
+				if err != nil { return err}
+				removeSchedule(scheduleId)
+				return nil
+			})
 	default:
 		w.WriteHeader(http.StatusMethodNotAllowed)
 	}

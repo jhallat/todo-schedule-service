@@ -76,7 +76,7 @@ func getSchedule(id int) (*WeeklySchedule, error) {
        description, 
        days
        FROM weekly_schedule
-       WHERE id = ?`, id)
+       WHERE id = $1`, id)
 	schedule := &WeeklyScheduleDTO{}
 	err := row.Scan(&schedule.Id,
 		&schedule.Description,
