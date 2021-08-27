@@ -1,23 +1,41 @@
 package main
 
 import (
+	"fmt"
 	_ "github.com/jackc/pgx/v4/stdlib"
+	"github.com/jhallat/todo-schedule-service/config"
 	"github.com/jhallat/todo-schedule-service/database"
 	"github.com/jhallat/todo-schedule-service/health"
+	"github.com/jhallat/todo-schedule-service/logger"
 	"github.com/jhallat/todo-schedule-service/schedule"
 	"github.com/jhallat/todo-schedule-service/task"
 	"github.com/jhallat/todo-schedule-service/weeklytask"
 	"net/http"
 )
 
+type Config struct {
+	DbHost     string `prop:"database.host" env:"SCHED_DB_HOST"`
+	DbUser     string `prop:"database.user" env:"SCHED_DB_USER"`
+	DbPassword string `prop:"database.password" env:"SCHED_DB_PASSWORD"`
+	DbPort     string `prop:"database.port" env:"SCHED_DB_PORT"`
+	DbName	   string `prop:"database.name" env:"SCHED_DB_NAME"`
+	QueueUrl   string `prop:"queue.url" env:"SCHED_QUEUE_URL"`
+}
 
 const apiBasePath = "/api"
+
 func main() {
-	database.SetupDatabase()
+
+	logger.LogMessage(logger.INFO, "Schedule API starting.")
+	configuration := &Config{}
+	config.Scan(configuration)
+	connection := fmt.Sprintf("user=%s password=%s host=%s port=%s database=%s sslmode=disable",
+		configuration.DbUser, configuration.DbPassword, configuration.DbHost, configuration.DbPort, configuration.DbName)
+	database.SetupDatabase(connection)
 	schedule.SetupRoutes(apiBasePath)
 	task.SetupRoutes(apiBasePath)
 	weeklytask.SetupRoutes(apiBasePath)
 	health.SetupHealth()
-	task.SetupListener()
+	task.SetupListener(configuration.QueueUrl)
 	http.ListenAndServe(":5002", nil)
 }

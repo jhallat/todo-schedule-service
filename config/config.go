@@ -1,88 +1,126 @@
 package config
 
 import (
+	"bufio"
 	"errors"
+	"flag"
 	"fmt"
-	"strings"
-	"unicode"
+	"os"
+	"reflect"
 )
 
-const (
-	stateStartProperty = iota
-	stateStartName
-	stateExpectEqual
-	stateStartValue
-)
 
-const flagProperty = "-P"
-
-func tokenizeCommandLine(commandLine string) []string {
-	tokens := make([]string,0)
-	currentToken := ""
-	for _, char := range commandLine {
-		if unicode.IsSpace(char) {
-			if len(currentToken) > 0 {
-				tokens = append(tokens, currentToken)
-				currentToken = ""
-			}
-			continue
-		}
-		if string(char) == "=" {
-			if len(currentToken) > 0 {
-				tokens = append(tokens, currentToken)
-			}
-			tokens = append(tokens, "=")
-			currentToken = ""
-			continue
-		}
-		currentToken = currentToken + string(char)
-	}
-	if len(currentToken) > 0 {
-		tokens = append(tokens, currentToken)
-	}
-	return tokens
+type propDef struct {
+	index int
+	field string
+	prop  string
+	env   string
 }
 
-func parseTokens(tokens []string) (map[string]string, error) {
-	properties := make(map[string]string)
-	property := ""
-	state := stateStartProperty
-	for index, token := range tokens {
-		switch state {
-		case stateStartProperty:
-			if token == flagProperty {
-				state = stateStartName
-			} else {
-				return nil, errors.New(fmt.Sprintf("expected '-P' at position %d", index))
-			}
-		case stateStartName:
-			property = token
-			state = stateExpectEqual
-		case stateExpectEqual:
-			if token != "=" {
-				return nil, errors.New(fmt.Sprintf("expected '=' at position %d", index))
-			}
-			state = stateStartValue
-		case stateStartValue:
-			properties[property] = token
-			state = stateStartProperty
-		}
-	}
-	return properties, nil
-}
 
-func ParseCommandLine(args []string, params map[string]string) error {
-	if len(args) <= 1 {
-		return nil
-	}
-	commandLine := strings.Join(args[1:], " ")
-	tokens := tokenizeCommandLine(commandLine)
-	parsed, err := parseTokens(tokens)
+func Scan(config interface{}) error {
+	propDefs := parsePropDefs(config)
+	profile, err := loadFlags(propDefs, config)
 	if err != nil {
 		return err
 	}
-	for key, value := range parsed {
-		params[key] = value
+	populateEnvironment(propDefs, config)
+	if profile != "" {
+		profile := "app-" + profile + ".config"
+		err = populateConfiguration(profile, propDefs, config)
+		if err != nil {
+			return err
+		}
+	}
+	err = populateConfiguration("app.config", propDefs, config)
+	return err
+}
+
+func parsePropDefs(config interface{}) []propDef {
+	propDefs := make([]propDef,0)
+	val := reflect.Indirect(reflect.ValueOf(config))
+	for i := 0; i < val.Type().NumField(); i++ {
+		propDefs = append(propDefs, propDef {
+			i,
+			val.Type().Field(i).Name,
+			val.Type().Field(i).Tag.Get("prop"),
+			val.Type().Field(i).Tag.Get("env"),
+		})
+	}
+	return propDefs
+}
+
+func loadFlags(propDefs []propDef, config interface{}) (string, error) {
+	flags := make(map[string]*string)
+	profile := flag.String("profile", "", "profile")
+	for _, item := range propDefs {
+		value := flag.String(item.prop, "", item.field)
+		flags[item.field] = value
+	}
+	flag.Parse()
+	for _, item := range propDefs {
+		if *flags[item.field] != "" {
+			err := setFieldIfEmpty(config, item.field, *flags[item.field])
+			if err != nil {
+				return "", err
+			}
+		}
+	}
+	return *profile, nil
+}
+
+func populateEnvironment(propDefs []propDef, config interface{}) {
+	for _, item := range propDefs {
+		env := os.Getenv(item.env)
+		if env != "" {
+			setFieldIfEmpty(config, item.field, env)
+		}
+	}
+}
+
+func populateConfiguration(filename string, propDefs []propDef, config interface{} ) error {
+
+	propMap := make(map[string]string)
+	_, err := os.Stat(filename)
+	if !os.IsNotExist(err) {
+		file, _ := os.Open("app.config")
+		defer file.Close()
+		scanner := bufio.NewScanner(file)
+		for scanner.Scan() {
+			var key string
+			var value string
+			num, err := fmt.Sscanf(scanner.Text(), "%s %s", &key, &value)
+			if err != nil || num != 2 {
+				return errors.New(fmt.Sprintf("invalid property file %s", filename))
+			}
+			propMap[key] = value
+		}
+	}
+	for _, item := range propDefs {
+		if propMap[item.prop] != "" {
+			err = setFieldIfEmpty(config, item.field, propMap[item.prop])
+			if err != nil {
+				return err
+			}
+		}
+	}
+	return nil
+}
+
+func setFieldIfEmpty(config interface{}, field string, value string) error {
+	val := reflect.ValueOf(config).Elem()
+	fld := val.FieldByName(field)
+	if fld.IsValid() {
+		if fld.String() != "" {
+			return nil
+		}
+		if fld.CanSet() {
+			fld.SetString(value)
+		} else {
+			return errors.New(fmt.Sprintf("Cannot set %s", field))
+		}
+	} else {
+		return errors.New(fmt.Sprintf("%s is not a valid field", field))
 	}
 	return nil
 }
