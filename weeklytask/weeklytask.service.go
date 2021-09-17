@@ -19,19 +19,38 @@ func SetupRoutes(apiBasePath string) {
 }
 
 func weeklyTasksHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("weeklyTasksHandler")
 	switch r.Method {
 	case http.MethodPost:
+		fmt.Println("POST")
 		var weeklyTask WeeklyTask
 		httphelper.PostRequest(w, r, "Id", &weeklyTask, func( ) (int64, error) {
 			id, err := insertWeeklyTask(weeklyTask)
 			return int64(id), err
 		})
+	case http.MethodPut:
+		fmt.Println("PUT")
+		var weeklyTask WeeklyTask
+		httphelper.PutRequest(w, r,
+			"weekly-tasks/:id",
+			"Id",
+			weeklyTask,
+			func(params map[string]string) (interface{}, error) {
+				id := params["id"]
+				weeklyTaskId, err := strconv.Atoi(id)
+				if err != nil { return nil, err }
+				return getWeeklyTask(weeklyTaskId)
+			},
+			func() error {
+				return updateWeeklyTask(weeklyTask)
+			})
 	case http.MethodOptions:
 		return
 	}
 }
 
 func weeklyTaskHandler(w http.ResponseWriter, r *http.Request) {
+	fmt.Println("weeklyTaskHandler")
 	switch r.Method {
 	case http.MethodGet:
 		httphelper.GetRequest(w, r, "weekly-tasks/:id", func(params map[string]string) (interface{}, error) {

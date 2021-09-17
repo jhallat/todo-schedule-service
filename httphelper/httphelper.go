@@ -3,9 +3,12 @@ package httphelper
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/jhallat/todo-schedule-service/logger"
 	"io/ioutil"
 	"log"
 	"net/http"
+	"net/url"
 	"reflect"
 	"strings"
 )
@@ -35,26 +38,49 @@ func GetRequest(writer http.ResponseWriter,
 	writer.Write(response)
 }
 
+func GetQueryRequest(writer http.ResponseWriter,
+	request *http.Request,
+	function func (values url.Values) (interface{}, error))  {
+	value, err := function(request.URL.Query())
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		log.Print(err)
+		return
+	}
+	response, err := json.Marshal(value)
+	if err != nil {
+		writer.WriteHeader(http.StatusInternalServerError)
+		log.Print(err)
+		return
+	}
+	writer.Header().Set("Content-Type", "application/json")
+	writer.Write(response)
+}
+
 func PostRequest(writer http.ResponseWriter,
 	             request *http.Request,
 	             idField string,
 	             value interface{},
 	             function func () (int64, error)) {
 
-
+	logger.Debug("Post request called")
 	bodyBytes, err := ioutil.ReadAll(request.Body)
 	if err != nil {
+		logger.Warn("Bad Request - error converting body to bytes")
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	err = json.Unmarshal(bodyBytes, &value)
 	if err != nil {
+		logger.Warn(fmt.Sprintf("Bad Request - error unmarshalling json - %s", bodyBytes))
+		logger.Warn(err.Error())
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}
 	reflected := reflect.ValueOf(value).Elem()
 	id := reflected.FieldByName(idField)
 	if id.Int() != 0 {
+		logger.Warn(fmt.Sprintf("Bad Request - id does not equal 0 on POST, provided data = %+v", value))
 		writer.WriteHeader(http.StatusBadRequest)
 		return
 	}

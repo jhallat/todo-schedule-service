@@ -2,6 +2,7 @@ package weeklytask
 
 import (
 	"database/sql"
+	"fmt"
 	"github.com/jhallat/todo-schedule-service/database"
 	"log"
 )
@@ -70,8 +71,9 @@ func updateWeeklyTask(weeklyTask WeeklyTask) error {
 }
 
 func insertWeeklyTask(weeklyTask WeeklyTask) (int, error) {
+	fmt.Println("insert weekly task")
 	result, err := database.DbConnection.Exec(sqlInsertWeeklyTask,
-		weeklyTask.Id,
+		weeklyTask.TaskId,
 		weeklyTask.TaskDescription,
 		weeklyTask.TaskQuantifiable,
 		weeklyTask.Paused,
