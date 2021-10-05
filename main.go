@@ -7,9 +7,7 @@ import (
 	"github.com/jhallat/todo-schedule-service/database"
 	"github.com/jhallat/todo-schedule-service/health"
 	"github.com/jhallat/todo-schedule-service/logger"
-	"github.com/jhallat/todo-schedule-service/schedule"
 	"github.com/jhallat/todo-schedule-service/task"
-	"github.com/jhallat/todo-schedule-service/weeklytask"
 	"net/http"
 )
 
@@ -32,9 +30,7 @@ func main() {
 	connection := fmt.Sprintf("user=%s password=%s host=%s port=%s database=%s sslmode=disable",
 		configuration.DbUser, configuration.DbPassword, configuration.DbHost, configuration.DbPort, configuration.DbName)
 	database.SetupDatabase(connection)
-	schedule.SetupRoutes(apiBasePath)
 	task.SetupRoutes(apiBasePath)
-	weeklytask.SetupRoutes(apiBasePath)
 	health.SetupHealth()
 	task.SetupListener(configuration.QueueUrl)
 	http.ListenAndServe(":5002", nil)
