@@ -8,8 +8,6 @@ import (
 	"github.com/jhallat/todo-schedule-service/health"
 	"github.com/jhallat/todo-schedule-service/logger"
 	"github.com/jhallat/todo-schedule-service/schedule"
-	"github.com/jhallat/todo-schedule-service/task"
-	"github.com/jhallat/todo-schedule-service/weeklytask"
 	"net/http"
 )
 
@@ -33,9 +31,10 @@ func main() {
 		configuration.DbUser, configuration.DbPassword, configuration.DbHost, configuration.DbPort, configuration.DbName)
 	database.SetupDatabase(connection)
 	schedule.SetupRoutes(apiBasePath)
-	task.SetupRoutes(apiBasePath)
-	weeklytask.SetupRoutes(apiBasePath)
 	health.SetupHealth()
-	task.SetupListener(configuration.QueueUrl)
-	http.ListenAndServe(":5002", nil)
+	schedule.SetupTaskListener(configuration.QueueUrl)
+	err := http.ListenAndServe(":5002", nil)
+	if err != nil {
+		fmt.Println(err)
+	}
 }
