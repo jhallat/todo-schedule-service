@@ -1,4 +1,4 @@
-package task
+package schedule
 
 import (
 	"encoding/json"
@@ -7,7 +7,7 @@ import (
 	"time"
 )
 
-func SetupListener(url string) {
+func SetupTaskListener(url string) {
 
 	go func() {
 		conn, err := amqp.Dial(url)

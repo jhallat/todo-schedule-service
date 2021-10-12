@@ -1,4 +1,4 @@
-package task
+package schedule
 
 import (
 	"fmt"
@@ -24,7 +24,7 @@ type Weekly struct {
 }
 
 type Daily struct {
-	Day	     JsonDate `json:"day"`
+	Day	     JsonDate  `json:"day"`
 	Quantity int       `json:"quantity"`
 }
 
@@ -48,6 +48,12 @@ type ScheduleForDay struct {
 	Quantity	     int         `json:"quantity"`
 	GoalId			 int         `json:"goalId"`
 	GoalDescription  string      `json:"goalDescription"`
+	Paused           bool        `json:"paused"`
+}
+
+type SchedulesForRange struct {
+	Day	           JsonDate          `json:"day"`
+	ScheduledTasks *[]ScheduleForDay `json:"scheduledTasks""`
 }
 
 func (j *JsonDate) UnmarshalJSON(b []byte) error {

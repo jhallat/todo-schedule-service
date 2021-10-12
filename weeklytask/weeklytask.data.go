@@ -71,7 +71,7 @@ func updateWeeklyTask(weeklyTask WeeklyTask) error {
 }
 
 func insertWeeklyTask(weeklyTask WeeklyTask) (int, error) {
-	fmt.Println("insert weekly task")
+	fmt.Println("insert weekly schedule")
 	result, err := database.DbConnection.Exec(sqlInsertWeeklyTask,
 		weeklyTask.TaskId,
 		weeklyTask.TaskDescription,

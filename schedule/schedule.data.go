@@ -1,4 +1,4 @@
-package task
+package schedule
 
 import (
 	"database/sql"
@@ -57,7 +57,6 @@ const sqlGetAllSchedules = `
 	       goal_id as GoalId,
 	       goal_description as GoalDescription
     FROM schedule
-    WHERE paused = false
 `
 
 const sqlGetWeeklyCount = `
@@ -169,9 +168,32 @@ func getSchedule(taskId int) (*Schedule, error) {
 	return schedule, nil
 }
 
-func getSchedulesForDate(day time.Time) ([]ScheduleForDay, error) {
+func getScheduleForRange(start time.Time, end time.Time) ([]SchedulesForRange, error) {
+
+	ranges := make([]SchedulesForRange, 0)
+	for dateIndex := start; dateIndex.After(end) == false; dateIndex = dateIndex.AddDate(0, 0, 1) {
+		var schedules, err  =  getSchedulesForDate(dateIndex, true)
+		if err != nil {
+			return nil, err
+		}
+		var schedule = SchedulesForRange{
+			JsonDate(dateIndex),
+			&schedules,
+		}
+		ranges = append(ranges, schedule)
+	}
+	return ranges, nil
+}
+
+func getSchedulesForDate(day time.Time, includedPaused bool) ([]ScheduleForDay, error) {
 	dayOfWeek := day.Weekday()
-	results, err := database.DbConnection.Query(sqlGetAllSchedules)
+	var sql string
+	if includedPaused {
+		sql = sqlGetAllSchedules
+	} else {
+		sql = sqlGetAllSchedules + " WHERE paused = false"
+	}
+	results, err := database.DbConnection.Query(sql)
 	if err != nil {
 		return nil, err
 	}
@@ -193,6 +215,7 @@ func getSchedulesForDate(day time.Time) ([]ScheduleForDay, error) {
 			ScheduleType: schedule.ScheduleType,
 			GoalId: schedule.GoalId,
 			GoalDescription: schedule.GoalDescription,
+			Paused: schedule.Paused,
 		}
 		if schedule.ScheduleType == "WEEKLY" {
 			weekly, err := getWeekly(schedule.TaskId)
