@@ -13,6 +13,11 @@ type UpdatedTask struct {
 	 Description string `json:"description"`
 }
 
+type UpdatedWeeklyMaxReached struct {
+	TaskId     int  `json:"taskId"`
+	MaxReached bool `json:"maxReached"'`
+}
+
 type Weekly struct {
 	Sunday           int    `json:"sunday"`
 	Monday           int    `json:"monday"`
@@ -21,6 +26,8 @@ type Weekly struct {
 	Thursday         int    `json:"thursday"`
 	Friday           int    `json:"friday"`
 	Saturday         int    `json:"saturday"`
+	Max              int    `json:"max"`
+	MaxReached       bool   `json:"maxReached"`
 }
 
 type Daily struct {
@@ -49,6 +56,8 @@ type ScheduleForDay struct {
 	GoalId			 int         `json:"goalId"`
 	GoalDescription  string      `json:"goalDescription"`
 	Paused           bool        `json:"paused"`
+	WeeklyMax        int         `json:"weeklyMax"`
+	WeeklyMaxReached bool        `json:"WeeklyMaxReached"`
 }
 
 type SchedulesForRange struct {

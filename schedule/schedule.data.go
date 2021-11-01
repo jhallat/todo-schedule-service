@@ -72,7 +72,9 @@ const sqlGetWeekly = `
            wednesday as Wednesday,
            thursday as Thursday,
            friday as Friday,
-           saturday as Saturday
+           saturday as Saturday,
+	       max as Max,
+	       max_reached as MaxReached
     FROM weekly
     WHERE task_id = $1
 `
@@ -87,8 +89,8 @@ const sqlGetDaily = `
 
 const sqlInsertWeekly = `
 	INSERT INTO 
-    weekly (task_id, sunday, monday, tuesday, wednesday, thursday, friday, saturday)
-    VALUES ($1, $2, $3, $4, $5, $6, $7, $8)
+    weekly (task_id, sunday, monday, tuesday, wednesday, thursday, friday, saturday, max, max_reached)
+    VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, false)
 `
 
 const sqlUpdateWeekly = `
@@ -99,7 +101,13 @@ const sqlUpdateWeekly = `
         wednesday = $5,
         thursday = $6,
         friday = $7,
-        saturday = $8
+        saturday = $8,
+        max = $9 
+    WHERE task_id = $1
+`
+const sqlUpdateWeeklyMaxReached = `
+	UPDATE weekly
+    SET max_reached = $2
     WHERE task_id = $1
 `
 
@@ -216,6 +224,8 @@ func getSchedulesForDate(day time.Time, includedPaused bool) ([]ScheduleForDay, 
 			GoalId: schedule.GoalId,
 			GoalDescription: schedule.GoalDescription,
 			Paused: schedule.Paused,
+			WeeklyMax: 0,
+			WeeklyMaxReached: false,
 		}
 		if schedule.ScheduleType == "WEEKLY" {
 			weekly, err := getWeekly(schedule.TaskId)
@@ -238,6 +248,8 @@ func getSchedulesForDate(day time.Time, includedPaused bool) ([]ScheduleForDay, 
 			case time.Saturday:
 				scheduleForDay.Quantity = weekly.Saturday
 			}
+			scheduleForDay.WeeklyMax = weekly.Max
+			scheduleForDay.WeeklyMaxReached = weekly.MaxReached
 		}
 		if schedule.ScheduleType == "DAILY" {
 			daily, err := getDaily(schedule.TaskId)
@@ -266,7 +278,9 @@ func getWeekly(taskId int) (*Weekly, error) {
 		            &weekly.Wednesday,
 		            &weekly.Thursday,
 		            &weekly.Friday,
-		            &weekly.Saturday)
+		            &weekly.Saturday,
+		            &weekly.Max,
+		            &weekly.MaxReached)
 	if err == sql.ErrNoRows {
 		return nil, nil
 	} else if err != nil {
@@ -367,7 +381,8 @@ func saveWeekly(taskId int, weekly *Weekly) error {
 			weekly.Wednesday,
 			weekly.Thursday,
 			weekly.Friday,
-			weekly.Saturday)
+			weekly.Saturday,
+			weekly.Max)
 		return err
 	} else {
 		_, err = database.DbConnection.Exec(sqlUpdateWeekly,
@@ -378,9 +393,17 @@ func saveWeekly(taskId int, weekly *Weekly) error {
 			weekly.Wednesday,
 			weekly.Thursday,
 			weekly.Friday,
-			weekly.Saturday)
+			weekly.Saturday,
+			weekly.Max)
 		return err
 	}
+}
+
+func updateWeeklyMaxReached(taskId int, maxReached bool) error {
+	_, err := database.DbConnection.Exec(sqlUpdateWeeklyMaxReached,
+		taskId,
+		maxReached)
+	return err
 }
 
 func saveDaily(taskId int, daily *Daily) error {

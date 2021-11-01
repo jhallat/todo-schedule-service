@@ -15,14 +15,47 @@ import (
 
 const scheduledTasksBasePath = "schedule"
 
+//TODO create handler for max weekly reached !!!
+
 func SetupRoutes(apiBasePath string) {
 	handleTasks := http.HandlerFunc(tasksHandler)
 	handleTask := http.HandlerFunc(taskHandler)
 	handleRange := http.HandlerFunc(rangeHandler)
+	handleWeeklyMax := http.HandlerFunc(weeklyMaxHandler)
 	http.Handle(fmt.Sprintf("%s/%s/range", apiBasePath, scheduledTasksBasePath), cors.Middleware(handleRange))
 	http.Handle(fmt.Sprintf("%s/%s/range/", apiBasePath, scheduledTasksBasePath), cors.Middleware(handleRange))
 	http.Handle(fmt.Sprintf("%s/%s", apiBasePath,  scheduledTasksBasePath), cors.Middleware(handleTask))
 	http.Handle(fmt.Sprintf("%s/%s/", apiBasePath,  scheduledTasksBasePath), cors.Middleware(handleTasks))
+	http.Handle(fmt.Sprintf("%s/%s/weekly-max", apiBasePath,  scheduledTasksBasePath), cors.Middleware(handleWeeklyMax))
+}
+
+func weeklyMaxHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodPut:
+		var newMaxReached UpdatedWeeklyMaxReached
+		bodyBytes, err := ioutil.ReadAll(r.Body)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		err = json.Unmarshal(bodyBytes, &newMaxReached)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusBadRequest)
+			return
+		}
+		err = updateWeeklyMaxReached(newMaxReached.TaskId, newMaxReached.MaxReached)
+		if err != nil {
+			log.Print(err)
+			w.WriteHeader(http.StatusInternalServerError)
+			return
+		}
+		w.WriteHeader(http.StatusCreated)
+		return
+	case http.MethodOptions:
+		return
+	}
 }
 
 func tasksHandler(w http.ResponseWriter, r *http.Request) {
